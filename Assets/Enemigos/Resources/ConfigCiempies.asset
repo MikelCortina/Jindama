@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 841ef83309a320d4982bdb7f8469536a, type: 3}
+  m_Name: ConfigCiempies
+  m_EditorClassIdentifier: Assembly-CSharp::ConfigCiempies
+  puertasPorCiempies: 100000
+  maximo: 1
+  materialCabeza: {fileID: 0}
+  materialSegmento: {fileID: 0}
+  materialVulnerable: {fileID: 0}
+  materialPatas: {fileID: 0}
+  escala: 1
+  segmentos: 10
+  tamanoCabeza: 0.11
+  tamanoSegmento: 0.085
+  separacion: 0.12
+  parejasDePatas: 1
+  largoPata: 0.09
+  grosorPata: 0.012
+  ritmoPatas: 4
+  aperturaPasos: 30
+  velocidad: 0.77
+  giro: 160
+  serpenteo: 25
+  ritmoSerpenteo: 1.2
+  materialesPared: []
+  inclinacionMaxima: 0.55
+  alturaSobrePared: 0.6
+  cambioDeRumbo: 6
+  intervaloCristales: 15
+  golpesPorCristal: 4
+  intervaloGolpes: 0.3
+  alcanceGolpe: 0.35
+  vidaSegmento: 1
+  vidaCabeza: 2
+  latidoCola: 0.18
+  trocitosAlRomper: 16

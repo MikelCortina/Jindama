@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1ebd180e7d3ccd7488e642129b198f87, type: 3}
+  m_Name: ConfigAranas
+  m_EditorClassIdentifier: Assembly-CSharp::ConfigAranas
+  maximo: 6
+  probabilidad: 1
+  porPuerta: 1
+  atras: 0.12
+  distanciaSalida: 0.3
+  materialCuerpo: {fileID: 2100000, guid: 98c81fa828dee5f4f849736dd3091359, type: 2}
+  materialPatas: {fileID: 2100000, guid: 6e7ebb9fb63e82b429f236d69544e07b, type: 2}
+  escala: 1
+  tamano: 0.12
+  alturaCuerpo: 0.1
+  largoMuslo: 0.2
+  largoTibia: 0.2
+  grosorPata: 0.017
+  aperturaPatas: 0.22
+  patasPorLado: 2
+  velocidad: 0.7
+  giro: 300
+  distanciaPaso: 0.06
+  tiempoPaso: 0.08
+  alturaPaso: 0.05
+  escalarParedes: 1
+  alturaParaEscalar: 0.08
+  lanzarCristales: 1
+  radioCristales: 0.9
+  alcanceCoger: 0.25
+  tiempoCoger: 0.25
+  tiempoApuntar: 0.5
+  esperaTrasLanzar: 2
+  alcanceSalto: 0.9
+  tiempoSalto: 0.45
+  esperaTrasSalto: 1.5
+  radioGolpe: 0.1
+  penalizacionVelocidad: 0.05
+  balasQuePierdes: 1
+  cristalProtector: 1
+  alturaCristal: 0.66
+  oscilacionCristal: 0.1
+  velocidadOscilacion: 0.6
+  giroCristal: 90
+  tamanoCristal: 0.15
+  vidaCristal: 1
+  grosorCuerda: 0.01
+  materialCristal: {fileID: 2100000, guid: 461f8a415098945f38f0bc1ad7c9956e, type: 2}
+  materialCuerda: {fileID: 2100000, guid: 6e7ebb9fb63e82b429f236d69544e07b, type: 2}
+  vida: 1
+  trocitosAlMorir: 18
