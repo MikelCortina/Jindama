@@ -107,6 +107,12 @@ public class ConfigAranas : ScriptableObject
     public Material materialCristal;
     [Tooltip("Material de la cuerda (vacío = el de las patas).")]
     public Material materialCuerda;
+    [Tooltip("Al romperse, el cristal suelta un trozo de cristal (como los de los cubos: se puede atraer, atrapar o devolver).")]
+    public bool soltarCristal = true;
+    [Tooltip("Tamaño del trozo que suelta respecto al cristal protector.")]
+    public float tamanoCristalSuelto = 1.5f;
+    [Tooltip("Segundos que dura el trozo suelto antes de encoger y desaparecer (0 = para siempre).")]
+    public float vidaCristalSuelto = 8f;
 
     [Header("Vida")]
     [Tooltip("Disparos que aguanta.")]

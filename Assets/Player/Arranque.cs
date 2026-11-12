@@ -32,5 +32,6 @@ static class Arranque
         AtraerFragmentos.AnadirAlJugador();
         GeneradorAranas.Auto();
         GeneradorCiempies.Auto();
+        GeneradorLibelulas.Auto();
     }
 }

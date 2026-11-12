@@ -173,7 +173,7 @@ public class Ciempies : MonoBehaviour
     {
         if (c == null || c.isTrigger) return true;
         if (c.GetComponent<SegmentoCiempies>() != null || c.GetComponent<FracturePiece>() != null) return true;
-        if (c.GetComponentInParent<Arana>() != null || c.GetComponentInParent<FirstPersonController>() != null) return true;
+        if (c.GetComponentInParent<Arana>() != null || c.GetComponentInParent<Libelula>() != null || c.GetComponentInParent<FirstPersonController>() != null) return true;
         var rb = c.attachedRigidbody;
         return rb != null && !rb.isKinematic;
     }
@@ -670,6 +670,14 @@ public class Ciempies : MonoBehaviour
     }
 
     // ------------------------------------------------------------------ Daño
+
+    /// <summary>Estalla entero (todos los segmentos) y desaparece.</summary>
+    public void Estallar()
+    {
+        foreach (var s in segs)
+            if (s.r != null) CrystalBurst.Spawn(s.r, s.t.position, s.t.up, C.trocitosAlRomper, 1.2f * E, 0.45f, 0.35f);
+        Destroy(gameObject);
+    }
 
     /// <summary>¿Es la cola (el único segmento al que le hacen daño los disparos)?</summary>
     public bool EsCola(Transform segmento) => segs.Count > 0 && segs[segs.Count - 1].t == segmento;

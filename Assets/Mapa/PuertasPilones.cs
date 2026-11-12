@@ -21,6 +21,7 @@ public class PuertasPilones : MonoBehaviour
         public string nombrePilon;
         [System.NonSerialized] public Vector3 puertaArriba, pilonFuera, bajar, recoger;
         [System.NonSerialized] public bool ocupada;
+        [System.NonSerialized] public Vector3 centroHueco; // centro del hueco con la puerta subida
     }
 
     public List<Puerta> puertas = new List<Puerta>();
@@ -80,6 +81,7 @@ public class PuertasPilones : MonoBehaviour
             if (p.puerta == null) { Debug.LogWarning($"PuertasPilones: no encuentro la puerta '{p.nombrePuerta}'.", this); continue; }
 
             p.puertaArriba = p.puerta.position;
+            p.centroHueco = p.puerta.GetComponent<Renderer>() is Renderer rh ? rh.bounds.center : p.puertaArriba;
             // Baja por su propio eje Y local (el verde del gizmo en modo Local), hacia abajo, tanto como mide en ese eje.
             Vector3 eje = p.puerta.up;
             if (Vector3.Dot(eje, Vector3.down) > 0f) eje = -eje; // "hacia abajo": el sentido que baja
@@ -174,6 +176,31 @@ public class PuertasPilones : MonoBehaviour
     }
 
     /// <summary>Hacia dónde se sale por la puerta: en horizontal, hacia el centro del mapa (el padre de las piezas).</summary>
+    // ------------------------------------------------------------------ Fase final
+
+    /// <summary>Abre las 4 puertas (pilón recogido y puerta abajo) y las deja abiertas: se para el ciclo de puertas.</summary>
+    public void AbrirTodas()
+    {
+        StopAllCoroutines();
+        foreach (var p in puertas) if (p.puerta != null) StartCoroutine(AbrirYQuedarse(p));
+    }
+
+    IEnumerator AbrirYQuedarse(Puerta p)
+    {
+        p.ocupada = true;
+        if (p.pilon != null) yield return Mover(p.pilon, p.pilon.localPosition, p.pilonFuera + p.recoger, tiempoRecogerPilon, true);
+        float u = p.bajar.sqrMagnitude > 1e-8f ? Mathf.Clamp01(Vector3.Dot(p.puerta.position - p.puertaArriba, p.bajar) / p.bajar.sqrMagnitude) : 1f;
+        yield return Bajar(p, u, 1f, tiempoBajarPuerta * (1f - u));
+    }
+
+    /// <summary>Los huecos de las puertas: centro (con la puerta subida) y dirección hacia dentro del mapa.</summary>
+    public List<(Vector3 centro, Vector3 haciaDentro)> Huecos()
+    {
+        var l = new List<(Vector3, Vector3)>();
+        foreach (var p in puertas) if (p.puerta != null) l.Add((p.centroHueco, DireccionSalida(p)));
+        return l;
+    }
+
     static Vector3 DireccionSalida(Puerta p)
     {
         Vector3 centro = p.puerta.parent != null ? p.puerta.parent.position : Vector3.zero;

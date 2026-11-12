@@ -258,7 +258,8 @@ public class CrystalWeapon : MonoBehaviour
     void Update()
     {
         var mouse = Mouse.current;
-        if (mouse != null && mouse.leftButton.wasPressedThisFrame) Fire();
+        // El clic izquierdo puede usarlo otro antes (p.ej. AtraerFragmentos para devolver un cristal como perdigonada).
+        if (!estalladas && mouse != null && mouse.leftButton.wasPressedThisFrame && (interceptarClic == null || !interceptarClic())) Fire();
         if (balasPorPerder > 0) TryPerderBala();
         if (balasPorRecuperar > 0) TryRecuperarBala();
 
@@ -314,6 +315,32 @@ public class CrystalWeapon : MonoBehaviour
     /// <summary>Se lanza cada vez que sale un disparo de verdad (lo usa la mano derecha, ManoJugador).</summary>
     public event System.Action Fired;
 
+    /// <summary>Se llama al pulsar el clic izquierdo: si devuelve true, se ha usado para otra cosa y el arma no dispara.</summary>
+    [System.NonSerialized] public System.Func<bool> interceptarClic;
+
+    /// <summary>
+    /// Perdigonada: lanza <paramref name="cuantos"/> proyectiles pequeños (copias de la punta) desde <paramref name="origen"/>
+    /// hacia la mira, esparcidos en un cono de <paramref name="apertura"/> grados. No gastan balas del cargador.
+    /// </summary>
+    public void DispararPerdigones(Vector3 origen, int cuantos, float apertura, float tamano, float velocidad)
+    {
+        if (tip == null || cam == null) return;
+        Ray ray = Cursor.lockState == CursorLockMode.Locked || Mouse.current == null
+            ? cam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f))
+            : cam.ScreenPointToRay(Mouse.current.position.ReadValue());
+        Vector3 target = Physics.Raycast(ray, out var hit, maxDistance, hitLayers, QueryTriggerInteraction.Ignore) ? hit.point : ray.GetPoint(maxDistance);
+        Vector3 centro = (target - origen).sqrMagnitude > 1e-6f ? (target - origen).normalized : cam.transform.forward;
+        for (int i = 0; i < cuantos; i++)
+        {
+            // Repartidos por el cono (no todos en el centro): ángulo al azar alrededor y radio con raíz para que llenen el cono.
+            Quaternion giro = Quaternion.AngleAxis(Random.value * 360f, centro) *
+                              Quaternion.AngleAxis(Mathf.Sqrt(Random.value) * apertura, Vector3.Cross(centro, cam.transform.up).normalized);
+            var p = LaunchShard(tip, origen, giro * centro, tamano, velocidad > 0f ? velocidad : shardSpeed);
+            p.ladoReservado = -1;
+            p.eraLaUltima = false;
+        }
+    }
+
     public void Fire()
     {
         // Dispara la punta, que vuelve a crecer al momento si queda algún lateral: ese lateral queda reservado y solo se
@@ -342,6 +369,25 @@ public class CrystalWeapon : MonoBehaviour
 
     /// <summary>Estallan todas las balas (los laterales y la punta, también las que estaban reservadas): se queda sin ninguna.</summary>
     bool estalladas; // tras estallar todo, nada vuelve (ni las balas que estuvieran en el aire)
+
+    /// <summary>La animación de disparo del cristal (el shape de disparo), sin disparar.</summary>
+    public void AnimarDisparo() => shotTime = 0f;
+
+    /// <summary>El cristal entero estalla en fragmentos y desaparece (al quedarse sin balas: se pierde la partida).</summary>
+    public void Explotar()
+    {
+        EstallarTodas();
+        Renderer r = body != null ? (Renderer)body : GetComponentInChildren<Renderer>();
+        if (r != null)
+        {
+            Vector3 c = r.bounds.center;
+            CrystalBurst.Spawn(r, c, cam != null ? cam.transform.forward : transform.forward, trocitosExplosion, 2.2f, 1.2f, 0.3f);
+        }
+        gameObject.SetActive(false);
+    }
+
+    [Tooltip("Trocitos del cristal del arma al estallar (al quedarte sin balas).")]
+    public int trocitosExplosion = 90;
 
     public void EstallarTodas()
     {
@@ -495,15 +541,26 @@ public class CrystalWeapon : MonoBehaviour
         Vector3 target = Physics.Raycast(ray, out var hit, maxDistance, hitLayers, QueryTriggerInteraction.Ignore)
             ? hit.point
             : ray.GetPoint(maxDistance);
+        Vector3 start = MeshCenter(piece);
+        return LaunchShard(piece, start, (target - start).normalized, 1f, shardSpeed);
+    }
 
+    /// <summary>Lanza una copia de la pieza desde <paramref name="start"/> en la dirección <paramref name="dir"/>, con su tamaño por <paramref name="tamano"/>.</summary>
+    CrystalShard LaunchShard(Transform piece, Vector3 start, Vector3 dir, float tamano, float velocidad)
+    {
+        Vector3 target = start + dir;
         // Las piezas del modelo tienen el pivote en el origen del arma: la copia va dentro de un contenedor
         // centrado en la pieza, para que vuele y gire sobre sí misma.
-        Vector3 start = MeshCenter(piece);
+        Vector3 centroPieza = MeshCenter(piece);
         var shard = new GameObject("Proyectil de cristal");
-        shard.transform.position = start;
+        shard.transform.position = centroPieza;
         var copy = Instantiate(piece.gameObject, piece.position, piece.rotation);
         copy.transform.localScale = piece.lossyScale;
         copy.transform.SetParent(shard.transform, true);
+        // Tamaño (el proyectil pone su propia escala al crecer, así que se escala la copia, alrededor del centro).
+        copy.transform.localPosition *= tamano;
+        copy.transform.localScale *= tamano;
+        shard.transform.position = start;
         copy.SetActive(true);
         foreach (var c in copy.GetComponentsInChildren<Collider>()) Destroy(c);
         var projectile = shard.AddComponent<CrystalShard>();
@@ -519,7 +576,7 @@ public class CrystalWeapon : MonoBehaviour
         Vector3 haciaBala = Vector3.ProjectOnPlane(target - start, Vector3.up);
         float diagonal = haciaVista.sqrMagnitude > 1e-6f && haciaBala.sqrMagnitude > 1e-6f ? Vector3.SignedAngle(haciaBala, haciaVista, Vector3.up) : 0f;
         projectile.giroPrimerRebote = diagonal * correccionRebote + extraRebote;
-        projectile.Launch((target - start).normalized, shardSpeed, maxDistance, hitLayers, shardMaxScale, shardGrowTime);
+        projectile.Launch(dir, velocidad, maxDistance, hitLayers, shardMaxScale, shardGrowTime);
         return projectile;
     }
 

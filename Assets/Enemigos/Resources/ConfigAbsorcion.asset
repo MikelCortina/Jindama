@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6b35d2289967d4e46b2a55ac9f4cebab, type: 3}
   m_Name: ConfigAbsorcion
   m_EditorClassIdentifier: Assembly-CSharp::ConfigAbsorcion
-  activa: 1
+  activa: 0
   tiempoEnSuelo: 1.5
   velocidadSubida: 1
   giroSubida: 90

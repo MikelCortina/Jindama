@@ -197,7 +197,17 @@ public class Arana : MonoBehaviour
         vidaEscudo--;
         if (vidaEscudo > 0) return;
         if (escudoRenderer != null)
+        {
             CrystalBurst.Spawn(escudoRenderer, escudo.position, Vector3.up, C.trocitosAlMorir, 1.2f * E, 0.45f, 0.35f);
+            // Suelta un trozo de cristal, como los de los cubos (se puede atraer, atrapar o devolver).
+            if (C.soltarCristal)
+            {
+                var mf = escudo.GetComponent<MeshFilter>();
+                FracturePiece.Crear(mf != null ? mf.sharedMesh : null, escudoRenderer.sharedMaterial, escudo.gameObject.layer,
+                                    escudo.position, escudo.rotation, escudo.lossyScale * C.tamanoCristalSuelto,
+                                    Vector3.up * 1.2f * E + Random.insideUnitSphere * 0.4f * E, C.vidaCristalSuelto);
+            }
+        }
         Destroy(escudo.gameObject);
         if (cuerda != null) Destroy(cuerda.gameObject);
         escudo = null;
@@ -323,7 +333,7 @@ public class Arana : MonoBehaviour
     bool Ignorar(Collider c)
     {
         if (c == null || c.isTrigger) return true;
-        if (c.transform.IsChildOf(transform) || c.GetComponentInParent<Arana>() != null) return true;
+        if (c.transform.IsChildOf(transform) || c.GetComponentInParent<Arana>() != null || c.GetComponentInParent<Libelula>() != null) return true;
         if (jugador != null && c.transform.IsChildOf(jugador)) return true;
         if (c.GetComponent<FracturePiece>() != null || c.GetComponent<SegmentoCiempies>() != null) return true;
         var rb = c.attachedRigidbody;
@@ -783,7 +793,11 @@ public class Arana : MonoBehaviour
     {
         if (TieneEscudo) return; // primero hay que romper su cristal
         vida--;
-        if (vida <= 0) Morir(true);
+        if (vida <= 0)
+        {
+            if (Partida.Instancia != null) Partida.Instancia.ContarArana(); // cuenta para la fase final
+            Morir(true);
+        }
     }
 
     /// <summary>Se rompe en trocitos de cristal (y suelta el cristal si llevaba uno).</summary>

@@ -29,6 +29,7 @@ public class Absorcion : MonoBehaviour
     void Update()
     {
         if (rb == null || pieza == null || !C.activa) return;
+
         // Cogida, en la mano o siendo atraída por el jugador: nada de absorción.
         if (pieza.sujeta || GetComponent<FragmentoAtraido>() != null) { if (Subiendo) Detener(); quieta = 0f; return; }
 

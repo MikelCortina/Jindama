@@ -281,8 +281,101 @@ public class ManoJugador : MonoBehaviour
 
     void LateUpdate()
     {
-        if (fase != FaseAgarre.Nada) ActualizarAgarre();
+        if (escopetaT >= 0f) ActualizarEscopeta();
+        else if (fase != FaseAgarre.Nada) ActualizarAgarre();
         else if (gestoT >= 0f) ActualizarGesto();
+    }
+
+    // ------------------------------------------------------------------ Gesto de devolver (clic izquierdo al atrapar)
+    // Garra medio abierta -> aprieta el puño de golpe (estruja el cristal) -> la mano se abre de golpe con los dedos muy
+    // separados, empujando hacia delante (sale la perdigonada) -> aguanta abierta con el retroceso -> vuelve a su sitio.
+    // Lo lanza AtraerFragmentos al pulsar el clic izquierdo con un cristal dentro de la esfera.
+
+    [Header("Gesto de devolver (clic izquierdo al atrapar)")]
+    [Tooltip("Segundos que dura el gesto entero.")]
+    public float escopetaDuracion = 0.75f;
+    [Tooltip("Segundos hasta que el puño se cierra del todo (el cristal llega a la palma).")]
+    public float escopetaCerrar = 0.12f;
+    [Tooltip("Segundos que aguanta el puño apretado antes de abrirse de golpe (ahí sale la perdigonada).")]
+    public float escopetaApretar = 0.08f;
+    [Tooltip("Grados que se cierran los dedos al apretar el puño (base, medio, punta).")]
+    public Vector3 escopetaPuno = new Vector3(70f, 85f, 60f);
+    [Tooltip("Grados que se abren (estiran hacia atrás) los dedos al soltar (base, medio, punta).")]
+    public Vector3 escopetaAbrir = new Vector3(30f, 20f, 15f);
+    [Tooltip("Grados que se separan los dedos entre sí al abrirse.")]
+    public float escopetaSeparar = 14f;
+    [Tooltip("Eje local de los huesos de los dedos para separarlos (el de doblar es el X).")]
+    public Vector3 escopetaEjeSeparar = Vector3.forward;
+    [Tooltip("Cuánto empuja la mano hacia delante al abrirse (en largos de mano).")]
+    public float escopetaEmpuje = 0.45f;
+    [Tooltip("Cuánto se echa hacia atrás al apretar el puño (en largos de mano).")]
+    public float escopetaCarga = 0.15f;
+    [Tooltip("Grados del retroceso de la muñeca hacia arriba al soltar.")]
+    public float escopetaRetroceso = 18f;
+
+    float escopetaT = -1f;
+    Vector3 escopetaBasePos;
+    Quaternion escopetaBaseRot;
+
+    /// <summary>Segundos desde el inicio del gesto de devolver hasta que la mano se abre (cuando sale la perdigonada).</summary>
+    public float MomentoAbrirEscopeta => escopetaCerrar + escopetaApretar;
+
+    /// <summary>Gesto de devolver el cristal como una perdigonada. Corta el gesto de atraer y el agarre si los hubiera.</summary>
+    public void GestoEscopeta()
+    {
+        if (escopetaT >= 0f) return;
+        // Vuelve a la pose base de lo que estuviera haciendo antes de guardarla.
+        if (gestoT >= 0f) { transform.localPosition = gestoBasePos; transform.localRotation = gestoBaseRot; gestoT = -1f; }
+        if (fase != FaseAgarre.Nada) { transform.localPosition = agarreBasePos; transform.localRotation = agarreBaseRot; fase = FaseAgarre.Nada; peso = 0f; curl = 0f; }
+        escopetaBasePos = transform.localPosition;
+        escopetaBaseRot = transform.localRotation;
+        escopetaT = 0f;
+        BuscarDedos();
+    }
+
+    void ActualizarEscopeta()
+    {
+        escopetaT += Time.deltaTime;
+        float t1 = Mathf.Max(0.01f, escopetaCerrar), t2 = t1 + Mathf.Max(0f, escopetaApretar);
+        float total = Mathf.Max(t2 + 0.1f, escopetaDuracion);
+        float t3 = t2 + 0.07f;                         // se abre de golpe
+        float t4 = Mathf.Lerp(t3, total, 0.55f);       // aguanta abierta
+        float dedos, empuje, giro, separar;            // dedos: +1 puño, -1 abierta
+        float t = escopetaT;
+        if (t < t1) { float u = Mathf.SmoothStep(0f, 1f, t / t1); dedos = u; empuje = -escopetaCarga * u; giro = 0f; separar = 0f; }
+        else if (t < t2) { dedos = 1f + Mathf.Sin((t - t1) * 70f) * 0.04f; empuje = -escopetaCarga; giro = 0f; separar = 0f; } // aprieta (tiembla)
+        else if (t < t3) { float u = (t - t2) / (t3 - t2); u = 1f - (1f - u) * (1f - u); dedos = Mathf.Lerp(1f, -1f, u); empuje = Mathf.Lerp(-escopetaCarga, escopetaEmpuje, u); giro = escopetaRetroceso * u; separar = u; }
+        else if (t < t4) { float u = (t - t3) / (t4 - t3); dedos = -1f; empuje = Mathf.Lerp(escopetaEmpuje, escopetaEmpuje * 0.6f, u); giro = escopetaRetroceso * (1f - 0.3f * u); separar = 1f; }
+        else { float u = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((t - t4) / (total - t4))); dedos = Mathf.Lerp(-1f, 0f, u); empuje = Mathf.Lerp(escopetaEmpuje * 0.6f, 0f, u); giro = Mathf.Lerp(escopetaRetroceso * 0.7f, 0f, u); separar = 1f - u; }
+
+        transform.localPosition = escopetaBasePos;
+        transform.localRotation = escopetaBaseRot;
+        Vector3 haciaDelante = cam != null ? cam.transform.forward : transform.forward;
+        transform.position += haciaDelante * empuje * LargoMano;
+        if (Mano != null && cam != null && Mathf.Abs(giro) > 1e-3f) transform.RotateAround(Mano.position, cam.transform.right, -giro);
+
+        Vector3 grados = dedos >= 0f ? escopetaPuno * dedos : escopetaAbrir * dedos;
+        for (int d = 0; d < Dedos.Length; d++)
+        {
+            float pulgar = d == 4 ? 0.6f : 1f;
+            // Separación: el índice hacia un lado, el meñique hacia el otro, el pulgar se aparta más.
+            float abanico = (d == 4 ? -2f : d - 1.5f) * escopetaSeparar * separar;
+            for (int j = 0; j < 3; j++)
+            {
+                var h = huesosDedo[d, j];
+                if (h == null || (d == 4 && j == 0)) continue;
+                float g = (j == 0 ? grados.x : j == 1 ? grados.y : grados.z) * pulgar;
+                h.localRotation = h.localRotation * Quaternion.AngleAxis(g, Vector3.right);
+                if (j == 0 || (d == 4 && j == 1)) h.localRotation = h.localRotation * Quaternion.AngleAxis(abanico, escopetaEjeSeparar);
+            }
+        }
+
+        if (t >= total)
+        {
+            transform.localPosition = escopetaBasePos;
+            transform.localRotation = escopetaBaseRot;
+            escopetaT = -1f;
+        }
     }
 
     // ------------------------------------------------------------------ Gesto de atraer (clic derecho)
@@ -310,7 +403,7 @@ public class ManoJugador : MonoBehaviour
     /// <summary>Gesto de atraer cristales (no hace nada si la mano está agarrando un cristal).</summary>
     public void GestoAtraer()
     {
-        if (fase != FaseAgarre.Nada) return;
+        if (fase != FaseAgarre.Nada || escopetaT >= 0f) return;
         if (gestoT < 0f) { gestoBasePos = transform.localPosition; gestoBaseRot = transform.localRotation; }
         gestoT = 0f;
         BuscarDedos();

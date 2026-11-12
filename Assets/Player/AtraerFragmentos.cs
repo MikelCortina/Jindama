@@ -9,6 +9,9 @@ using UnityEngine.InputSystem;
 /// - Alrededor del jugador hay una esfera (trigger "Esfera de atrapada"). Si pulsas E mientras el trozo está dentro
 ///   y todavía no te ha dado, el trozo va con un lerp al centro de la palma izquierda y, al llegar, la mano hace la
 ///   animación de la E (GolpeAbajo): al cerrar el puño el cristal estalla en trocitos.
+/// - Si en ese mismo momento pulsas el clic izquierdo en vez de la E, la mano lo estruja y se abre de golpe: el cristal
+///   sale devuelto como una perdigonada (8 perdigones esparcidos hacia la mira) en vez de recuperar una bala, y el arma
+///   no dispara.
 /// - Si no lo atrapas, te golpea y el arma pierde una bala del cargador (como al disparar).
 /// - Sin un trozo que atrapar, la E no hace nada.
 /// Va en el jugador (el objeto con FirstPersonController); si no está, se añade solo al empezar la partida.
@@ -49,6 +52,18 @@ public class AtraerFragmentos : MonoBehaviour
     public float romperTras = 0.25f;
     [Tooltip("Arma de cristal: pierde una bala cuando un trozo te golpea. Vacía = la de la escena.")]
     public CrystalWeapon arma;
+
+    [Header("Devolver (clic izquierdo con el cristal dentro de la esfera)")]
+    [Tooltip("En vez de atraparlo con E, con clic izquierdo la mano lo estruja y lo devuelve como una perdigonada (no recupera bala).")]
+    public bool devolverConClic = true;
+    [Tooltip("Número de perdigones.")]
+    [Min(1)] public int perdigones = 8;
+    [Tooltip("Apertura del cono de la perdigonada (grados desde el centro de la mira).")]
+    public float aperturaPerdigones = 7f;
+    [Tooltip("Tamaño de cada perdigón respecto a una bala normal.")]
+    public float tamanoPerdigon = 0.45f;
+    [Tooltip("Velocidad de los perdigones (0 = la de las balas normales).")]
+    public float velocidadPerdigones = 0f;
 
     public enum TipoPropiedad { Color, Float, Vector }
 
@@ -96,7 +111,7 @@ public class AtraerFragmentos : MonoBehaviour
         public bool Choco => marca == null || marca.choco;
     }
 
-    enum Estado { Libre, Lerp, Agarrado, EnMano }
+    enum Estado { Libre, Lerp, Agarrado, EnMano, Devolviendo }
 
     readonly List<Vuelo> enVuelo = new List<Vuelo>();
     SphereCollider esfera;
@@ -143,6 +158,12 @@ public class AtraerFragmentos : MonoBehaviour
         cc = GetComponent<CharacterController>();
         if (arma == null) arma = GetComponentInChildren<CrystalWeapon>();
         if (arma == null) arma = FindAnyObjectByType<CrystalWeapon>();
+        if (arma != null) arma.interceptarClic = ClicIzquierdo;
+    }
+
+    void OnDestroy()
+    {
+        if (arma != null && arma.interceptarClic == ClicIzquierdo) arma.interceptarClic = null;
     }
 
     /// <summary>Escala del jugador en el mundo (para pasar de unidades del jugador a unidades del mundo).</summary>
@@ -335,9 +356,9 @@ public class AtraerFragmentos : MonoBehaviour
 
     // ------------------------------------------------------------------ Atrapar
 
-    void PulsarE()
+    /// <summary>El cristal atraído que está dentro de la esfera y más cerca (null si no hay ninguno que atrapar).</summary>
+    Vuelo Atrapable()
     {
-        if (estado != Estado.Libre) return;
         Vuelo mejor = null;
         float mejorD = float.MaxValue;
         foreach (var v in enVuelo)
@@ -346,10 +367,39 @@ public class AtraerFragmentos : MonoBehaviour
             float d = Vector3.Distance(v.rb.worldCenterOfMass, esfera.transform.position);
             if (d < mejorD) { mejorD = d; mejor = v; }
         }
+        return mejor;
+    }
 
+    void PulsarE()
+    {
+        if (estado != Estado.Libre) return;
+        var mejor = Atrapable();
         // La animación de la E solo sale si hay un cristal que atrapar.
         if (mejor == null || manoIzquierda == null) return;
+        Sujetar(mejor);
+        estado = Estado.Lerp;
+        // Feedback de que lo has cogido a tiempo: la mano va a por él con los dedos abiertos.
+        manoIzquierda.EmpezarAgarre(desde - manoIzquierda.CentroPalma);
+    }
 
+    /// <summary>
+    /// Clic izquierdo (lo llama el arma antes de disparar): si hay un cristal que atrapar, la mano lo estruja y lo
+    /// devuelve como una perdigonada, y el arma no dispara. Si no, devuelve false y el arma dispara normal.
+    /// </summary>
+    bool ClicIzquierdo()
+    {
+        if (!devolverConClic || estado != Estado.Libre || manoIzquierda == null || !isActiveAndEnabled) return false;
+        var mejor = Atrapable();
+        if (mejor == null) return false;
+        Sujetar(mejor);
+        estado = Estado.Devolviendo;
+        manoIzquierda.GestoEscopeta();
+        return true;
+    }
+
+    /// <summary>Lo quita de los vuelos y lo deja sin física, listo para llevarlo a la palma.</summary>
+    void Sujetar(Vuelo mejor)
+    {
         int idx = enVuelo.IndexOf(mejor);
         if (idx >= 0) Quitar(idx);
         Resaltar(mejor.rb.gameObject, true); // sigue resaltado mientras lo tienes
@@ -366,9 +416,6 @@ public class AtraerFragmentos : MonoBehaviour
         float tam = r != null ? r.bounds.size.magnitude : 0f;
         escalaMano = tam > tamanoEnMano && tam > 0f ? escalaOriginal * (tamanoEnMano / tam) : escalaOriginal;
         t = 0f;
-        estado = Estado.Lerp;
-        // Feedback de que lo has cogido a tiempo: la mano va a por él con los dedos abiertos.
-        manoIzquierda.EmpezarAgarre(desde - manoIzquierda.CentroPalma);
     }
 
     // En LateUpdate: la palma ya tiene la pose de este fotograma (el Animator se evalúa antes).
@@ -382,6 +429,18 @@ public class AtraerFragmentos : MonoBehaviour
         // El pivote de la pieza no tiene por qué ser su centro: llevar el centro de la malla a la palma.
         Vector3 centroLocal = sujeto.rb.centerOfMass;
         t += Time.deltaTime;
+
+        if (estado == Estado.Devolviendo)
+        {
+            // Va a la palma mientras el puño se cierra; al abrirse la mano de golpe, sale la perdigonada.
+            float momento = manoIzquierda.MomentoAbrirEscopeta;
+            float u = Mathf.Clamp01(t / Mathf.Max(0.01f, Mathf.Min(tiempoLerp, manoIzquierda.escopetaCerrar)));
+            float k = u * u * (3f - 2f * u);
+            tr.localScale = Vector3.Lerp(escalaOriginal, escalaMano, k);
+            tr.position = Vector3.Lerp(desde, palma, k) - tr.TransformVector(centroLocal);
+            if (t >= momento) Devolver(palma);
+            return;
+        }
 
         if (estado == Estado.Lerp)
         {
@@ -452,6 +511,27 @@ public class AtraerFragmentos : MonoBehaviour
             if (mat != r.sharedMaterial) Destroy(mat, vidaTrocitos * 1.5f + 0.5f); // cuando ya no quedan trocitos
         }
         if (arma != null) arma.RecuperarBala(); // atrapar un cristal te devuelve una bala
+        Destroy(v.rb.gameObject);
+        sujeto = null;
+        colsSujeto = null;
+        estado = Estado.Libre;
+    }
+
+    /// <summary>La mano se abre de golpe: el cristal estalla y sale como una perdigonada hacia la mira (no recupera bala).</summary>
+    void Devolver(Vector3 palma)
+    {
+        var v = sujeto;
+        var r = v.rb.GetComponent<Renderer>();
+        if (r != null)
+        {
+            float radio = r.bounds.extents.magnitude * 0.6f * escalaEstallido;
+            Vector3 fuera = cam != null ? cam.transform.forward : Vector3.forward;
+            var mat = MaterialResaltado(r.sharedMaterial);
+            CrystalBurst.Spawn(mat, r.gameObject.layer, palma, fuera, radio, trocitos,
+                               velocidadTrocitos * Escala, vidaTrocitos, tamanoTrocitos, transform);
+            if (mat != r.sharedMaterial) Destroy(mat, vidaTrocitos * 1.5f + 0.5f);
+        }
+        if (arma != null) arma.DispararPerdigones(palma, perdigones, aperturaPerdigones, tamanoPerdigon, velocidadPerdigones);
         Destroy(v.rb.gameObject);
         sujeto = null;
         colsSujeto = null;

@@ -32,7 +32,17 @@ public class Partida : MonoBehaviour
     [Tooltip("Tamaño del texto del tiempo (para una pantalla de 1080 de alto).")]
     public int tamanoTexto = 40;
 
+    [Tooltip("Segundos entre que estalla el cristal del arma (al quedarte sin balas) y la pantalla de derrota.")]
+    public float retrasoSinBalas = 1.5f;
+
     enum Estado { Jugando, Perdida }
+    int aranasMatadas;
+
+    /// <summary>Arañas matadas en esta partida.</summary>
+    public int AranasMatadas => aranasMatadas;
+
+    /// <summary>Una araña matada por el jugador.</summary>
+    public void ContarArana() { if (estado == Estado.Jugando) aranasMatadas++; }
 
     Estado estado;
     float tiempo;
@@ -120,7 +130,12 @@ public class Partida : MonoBehaviour
             if (perdiendo) { }
             else if (tiempo <= 0f) Perder("Se acabó el tiempo");
             // Sin balas (y sin ninguna bala aún en el aire, que podría darle a una araña y volver al cargador).
-            else if (arma != null && arma.Balas <= 0 && !arma.Ocupada && FindAnyObjectByType<CrystalShard>() == null) Perder("Sin balas");
+            else if (arma != null && arma.Balas <= 0 && !arma.Ocupada && FindAnyObjectByType<CrystalShard>() == null)
+            {
+                // Sin balas: el cristal del arma estalla y, al momento, se pierde la partida.
+                arma.Explotar();
+                PerderTras("Sin balas", retrasoSinBalas);
+            }
         }
         else
         {
@@ -169,6 +184,12 @@ public class Partida : MonoBehaviour
 
     void Perder(string porQue)
     {
+        if (estado != Estado.Jugando) return;
+        MostrarDerrota(porQue);
+    }
+
+    void MostrarDerrota(string porQue)
+    {
         if (estado == Estado.Perdida) return;
         estado = Estado.Perdida;
         motivo = porQue;
@@ -207,7 +228,8 @@ public class Partida : MonoBehaviour
         Sombra(new Rect(0, 20f * esc, Screen.width, estiloTiempo.fontSize * 1.4f), $"{min}:{seg:00.0}", estiloTiempo, c, esc);
         string info = (ritmo <= 0.001f ? "el tiempo está parado" : $"el tiempo corre ×{ritmo:0.00}")
                       + (velocidadBase < velocidadReferencia - 1e-4f ? $"   ·   velocidad máx {velocidadBase / velocidadReferencia * 100f:0}%" : "")
-                      + (arma != null ? $"   ·   balas {arma.Balas}" : "");
+                      + (arma != null ? $"   ·   balas {arma.Balas}" : "")
+                      + $"   ·   arañas {aranasMatadas}";
         Sombra(new Rect(0, 20f * esc + estiloTiempo.fontSize * 1.3f, Screen.width, estiloInfo.fontSize * 1.6f), info, estiloInfo, new Color(1f, 1f, 1f, 0.85f), esc);
 
         // Aviso de tiempo perdido.

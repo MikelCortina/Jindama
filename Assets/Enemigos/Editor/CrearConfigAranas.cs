@@ -15,6 +15,7 @@ static class CrearConfigAranas
         Asegurar<ConfigAranas>(ConfigAranas.RutaResources, false);
         Asegurar<ConfigCiempies>(ConfigCiempies.RutaResources, false);
         Asegurar<ConfigAbsorcion>(ConfigAbsorcion.RutaResources, false);
+        Asegurar<ConfigLibelulas>(ConfigLibelulas.RutaResources, false);
     };
 
     [MenuItem("Tools/Arañas/Configuración")]
@@ -25,6 +26,9 @@ static class CrearConfigAranas
 
     [MenuItem("Tools/Absorción/Configuración")]
     static void AbrirAbsorcion() => Asegurar<ConfigAbsorcion>(ConfigAbsorcion.RutaResources, true);
+
+    [MenuItem("Tools/Libélulas/Configuración")]
+    static void AbrirLibelulas() => Asegurar<ConfigLibelulas>(ConfigLibelulas.RutaResources, true);
 
     static void Asegurar<T>(string nombre, bool seleccionar) where T : ScriptableObject
     {

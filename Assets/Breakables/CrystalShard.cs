@@ -113,15 +113,17 @@ public class CrystalShard : MonoBehaviour
             var segmento = hit.collider.GetComponent<SegmentoCiempies>();
             if (segmento != null && segmento.RecibirDisparo()) Terminar(false);
 
-            // Arañas: primero su cristal protector; sin él, la araña.
+            // Arañas y libélulas: primero su cristal protector; sin él, el bicho.
             var escudo = hit.collider.GetComponent<CristalEscudo>();
-            var arana = hit.collider.GetComponentInParent<Arana>();
+            var arana = escudo == null ? hit.collider.GetComponentInParent<Arana>() : null;
+            var libelula = escudo == null && arana == null ? hit.collider.GetComponentInParent<Libelula>() : null;
             if (escudo != null) escudo.RecibirDisparo();
             else if (arana != null) arana.RecibirDisparo();
-            // Dar al cristal de una araña, o a una araña sin cristal, no gasta la bala (el lateral del cargador no se rompe).
-            // Dar al cuerpo de una araña que aún tiene su cristal sí la gasta: se rompe como contra cualquier otra cosa.
-            bool aranaConEscudo = escudo == null && arana != null && arana.TieneEscudo;
-            if ((escudo != null || arana != null) && !aranaConEscudo) Terminar(false);
+            else if (libelula != null) libelula.RecibirDisparo();
+            // Dar al cristal, o a un bicho sin cristal, no gasta la bala (el lateral del cargador no se rompe).
+            // Dar al cuerpo de uno que aún tiene su cristal sí la gasta: se rompe como contra cualquier otra cosa.
+            bool conEscudo = arana != null && arana.TieneEscudo;
+            if ((escudo != null || arana != null || libelula != null) && !conEscudo) Terminar(false);
             ImpactBurst(hit, cube);
             StartVanish();
             return;

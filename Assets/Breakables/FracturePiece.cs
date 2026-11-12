@@ -11,6 +11,37 @@ public class FracturePiece : MonoBehaviour
     const float MaxIgnoreTime = 3f;    // por si se queda dentro: después vuelve a chocar sí o sí
 
     public float lifetime = 8f;
+
+    /// <summary>
+    /// Crea un trozo de cristal suelto (con física, como los que salen de los cubos) con una copia de
+    /// <paramref name="malla"/>: se puede atraer, atrapar o devolver. Lo usan, p.ej., los cristales de las arañas al romperse.
+    /// </summary>
+    public static FracturePiece Crear(Mesh malla, Material material, int capa, Vector3 posicion, Quaternion rotacion,
+                                      Vector3 escala, Vector3 velocidad, float vida)
+    {
+        if (malla == null) return null;
+        var copia = Instantiate(malla); // la pieza destruye su malla al desaparecer: que no sea la compartida
+        copia.name = malla.name + " (suelto)";
+        var go = new GameObject("Cristal suelto");
+        go.layer = capa;
+        go.transform.SetPositionAndRotation(posicion, rotacion);
+        go.transform.localScale = escala;
+        go.AddComponent<MeshFilter>().sharedMesh = copia;
+        var mr = go.AddComponent<MeshRenderer>();
+        if (material != null) mr.sharedMaterial = material;
+        var mc = go.AddComponent<MeshCollider>();
+        mc.sharedMesh = copia;
+        mc.convex = true;
+        var rb = go.AddComponent<Rigidbody>();
+        rb.mass = 0.05f;
+        rb.interpolation = RigidbodyInterpolation.Interpolate;
+        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+        rb.linearVelocity = velocidad;
+        rb.angularVelocity = Random.insideUnitSphere * 6f;
+        var fp = go.AddComponent<FracturePiece>();
+        fp.lifetime = vida;
+        return fp;
+    }
     /// <summary>Mientras es true no envejece (lo usa AtraerFragmentos cuando la pieza está en la mano).</summary>
     [System.NonSerialized] public bool sujeta;
 
