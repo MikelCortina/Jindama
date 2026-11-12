@@ -495,6 +495,9 @@ public class AtraerFragmentos : MonoBehaviour
         return mat;
     }
 
+    /// <summary>Te has comido un cristal (lo has atraído y roto en el puño con la E): recuperas una bala.</summary>
+    public static event System.Action CristalComido;
+
     /// <summary>El cristal se rompe en el puño: trocitos como al romper un cubo, y desaparece.</summary>
     void Romper(Vector3 palma)
     {
@@ -511,6 +514,7 @@ public class AtraerFragmentos : MonoBehaviour
             if (mat != r.sharedMaterial) Destroy(mat, vidaTrocitos * 1.5f + 0.5f); // cuando ya no quedan trocitos
         }
         if (arma != null) arma.RecuperarBala(); // atrapar un cristal te devuelve una bala
+        CristalComido?.Invoke();
         Destroy(v.rb.gameObject);
         sujeto = null;
         colsSujeto = null;

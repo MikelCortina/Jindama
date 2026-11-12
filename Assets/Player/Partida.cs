@@ -245,7 +245,6 @@ public class Partida : MonoBehaviour
         Sombra(new Rect(0, 20f * esc, Screen.width, estiloTiempo.fontSize * 1.4f), $"{min}:{seg:00.0}", estiloTiempo, c, esc);
         string info = (ritmo <= 0.001f ? "el tiempo está parado" : $"el tiempo corre ×{ritmo:0.00}")
                       + (velocidadBase < velocidadReferencia - 1e-4f ? $"   ·   velocidad máx {velocidadBase / velocidadReferencia * 100f:0}%" : "")
-                      + (arma != null ? $"   ·   balas {arma.Balas}" : "")
                       + $"   ·   arañas {aranasMatadas}";
         Sombra(new Rect(0, 20f * esc + estiloTiempo.fontSize * 1.3f, Screen.width, estiloInfo.fontSize * 1.6f), info, estiloInfo, new Color(1f, 1f, 1f, 0.85f), esc);
 

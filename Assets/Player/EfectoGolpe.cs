@@ -3,8 +3,8 @@ using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
 /// <summary>
-/// Al perder una bala (<see cref="CrystalWeapon.BalaPerdida"/>) la pantalla se pone roja por los bordes y los colores
-/// se separan (aberración cromática), como cuando te dan. Con una sola bala, el borde rojo late un poco.
+/// Al comerte un cristal (atraerlo y romperlo con la E, <see cref="AtraerFragmentos.CristalComido"/>) la pantalla se
+/// pone roja por los bordes y los colores se separan (aberración cromática). Perder una bala ya no lo lanza. Con una sola bala, el borde rojo late un poco.
 /// Usa un Volume global propio (viñeta + aberración cromática del URP) cuyo peso sube y baja, así que no pisa los
 /// ajustes de tus otros Volumes cuando no está activo. Activa el post-procesado de la cámara principal si estaba apagado.
 /// Lo añade <see cref="Arranque"/> solo si no está en la escena.
@@ -25,9 +25,9 @@ public class EfectoGolpe : MonoBehaviour
     [Range(0f, 1f)] public float intensidadAberracion = 1f;
 
     [Header("Tiempos")]
-    [Tooltip("Segundos que tarda en desaparecer el efecto tras perder una bala.")]
+    [Tooltip("Segundos que tarda en desaparecer el efecto tras comerte un cristal.")]
     public float duracion = 0.7f;
-    [Tooltip("Cuánto sube el efecto por cada bala perdida a la vez.")]
+    [Tooltip("Cuánto sube el efecto cada vez.")]
     public float porBala = 1f;
 
     [Header("Con una bala")]
@@ -44,6 +44,11 @@ public class EfectoGolpe : MonoBehaviour
     Vignette vineta;
     ChromaticAberration aberracion;
     float golpe;
+
+    void OnEnable() => AtraerFragmentos.CristalComido += AlComer;
+    void OnDisable() => AtraerFragmentos.CristalComido -= AlComer;
+
+    void AlComer() => golpe = Mathf.Clamp01(golpe + porBala);
 
     void Start()
     {
@@ -66,11 +71,7 @@ public class EfectoGolpe : MonoBehaviour
 
     void Buscar()
     {
-        if (arma == null)
-        {
-            arma = FindAnyObjectByType<CrystalWeapon>();
-            if (arma != null) arma.BalaPerdida += AlPerder;
-        }
+        if (arma == null) arma = FindAnyObjectByType<CrystalWeapon>(); // solo para el latido con una bala
         if (activarPostProcesado && Camera.main != null)
         {
             var datos = Camera.main.GetUniversalAdditionalCameraData();
@@ -80,11 +81,8 @@ public class EfectoGolpe : MonoBehaviour
 
     void OnDestroy()
     {
-        if (arma != null) arma.BalaPerdida -= AlPerder;
         if (perfil != null) Destroy(perfil);
     }
-
-    void AlPerder(int cuantas) => golpe = Mathf.Clamp01(golpe + porBala * Mathf.Max(1, cuantas));
 
     /// <summary>Lanza el efecto a mano (por si lo quieres usar para otras cosas).</summary>
     public void Golpe(float fuerza = 1f) => golpe = Mathf.Clamp01(golpe + fuerza);
