@@ -56,5 +56,8 @@ MonoBehaviour:
   grosorCuerda: 0.01
   materialCristal: {fileID: 2100000, guid: 461f8a415098945f38f0bc1ad7c9956e, type: 2}
   materialCuerda: {fileID: 2100000, guid: 6e7ebb9fb63e82b429f236d69544e07b, type: 2}
+  soltarCristal: 1
+  tamanoCristalSuelto: 0.2
+  vidaCristalSuelto: 8
   vida: 1
   trocitosAlMorir: 18

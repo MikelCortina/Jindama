@@ -202,16 +202,62 @@ public class Arana : MonoBehaviour
             // Suelta un trozo de cristal, como los de los cubos (se puede atraer, atrapar o devolver).
             if (C.soltarCristal)
             {
-                var mf = escudo.GetComponent<MeshFilter>();
-                FracturePiece.Crear(mf != null ? mf.sharedMesh : null, escudoRenderer.sharedMaterial, escudo.gameObject.layer,
-                                    escudo.position, escudo.rotation, escudo.lossyScale * C.tamanoCristalSuelto,
+                // Se ha hecho añicos y solo queda una esquirla pequeña, del tamaño de los trozos de las paredes.
+                float tam = C.tamanoCristalSuelto > 0f ? C.tamanoCristalSuelto : TamanoTrozoPared();
+                var malla = Esquirla(tam);
+                FracturePiece.Crear(malla, escudoRenderer.sharedMaterial, escudo.gameObject.layer,
+                                    escudo.position, Random.rotation, Vector3.one,
                                     Vector3.up * 1.2f * E + Random.insideUnitSphere * 0.4f * E, C.vidaCristalSuelto);
+                Destroy(malla); // Crear usa su propia copia
             }
         }
         Destroy(escudo.gameObject);
         if (cuerda != null) Destroy(cuerda.gameObject);
         escudo = null;
         cuerda = null;
+    }
+
+    /// <summary>Tamaño típico de un trozo de los cubos de las paredes (lado del cubo entre su número de trozos por lado).</summary>
+    static float TamanoTrozoPared()
+    {
+        var cubo = FindAnyObjectByType<PyramidCube>();
+        if (cubo == null) return 0.03f;
+        Vector3 s = cubo.transform.lossyScale;
+        float lado = cubo.size * Mathf.Max(Mathf.Abs(s.x), Mathf.Max(Mathf.Abs(s.y), Mathf.Abs(s.z)));
+        return lado / Mathf.Max(1, cubo.detail) * 0.6f;
+    }
+
+    /// <summary>Esquirla irregular de cristal (tetraedro deformado, caras planas) de unos <paramref name="tam"/> de largo.</summary>
+    static Mesh Esquirla(float tam)
+    {
+        float h = tam * 0.5f;
+        var p = new Vector3[4];
+        p[0] = new Vector3(0f, h * Random.Range(0.9f, 1.3f), 0f);
+        for (int i = 0; i < 3; i++)
+        {
+            float a = (i * 120f + Random.Range(-25f, 25f)) * Mathf.Deg2Rad;
+            float r = h * Random.Range(0.45f, 0.8f);
+            p[i + 1] = new Vector3(Mathf.Cos(a) * r, -h * Random.Range(0.3f, 0.6f), Mathf.Sin(a) * r);
+        }
+        Vector3 c = (p[0] + p[1] + p[2] + p[3]) * 0.25f;
+        int[,] caras = { { 0, 1, 2 }, { 0, 2, 3 }, { 0, 3, 1 }, { 1, 3, 2 } };
+        var verts = new Vector3[12];
+        var idx = new int[12];
+        for (int f = 0; f < 4; f++)
+        {
+            Vector3 a = p[caras[f, 0]] - c, b = p[caras[f, 1]] - c, d = p[caras[f, 2]] - c;
+            // Unity: cara frontal en sentido horario visto desde fuera (normal = cross(b-a, d-a) hacia fuera).
+            if (Vector3.Dot(Vector3.Cross(b - a, d - a), a + b + d) < 0f) { var t = b; b = d; d = t; }
+            verts[f * 3] = a; verts[f * 3 + 1] = b; verts[f * 3 + 2] = d;
+            idx[f * 3] = f * 3; idx[f * 3 + 1] = f * 3 + 1; idx[f * 3 + 2] = f * 3 + 2;
+        }
+        var m = new Mesh { name = "Esquirla" };
+        m.vertices = verts;
+        m.triangles = idx;
+        m.RecalculateNormals();
+        m.RecalculateBounds();
+        NormalesParaContorno(m);
+        return m;
     }
 
     /// <summary>Aplica los materiales del asset de configuración (también si se cambian en Play).</summary>
