@@ -687,7 +687,11 @@ public class Ciempies : MonoBehaviour
         foreach (var p in cola.patas) if (p != null) Destroy(p.gameObject);
         Destroy(cola.t.gameObject);
         segs.RemoveAt(segs.Count - 1);
-        if (segs.Count == 0) Destroy(gameObject); // era la cabeza: muerto
+        if (segs.Count == 0) // era la cabeza: muerto
+        {
+            if (Partida.Instancia != null) Partida.Instancia.EnemigoMatado();
+            Destroy(gameObject);
+        }
         return true;
     }
 }

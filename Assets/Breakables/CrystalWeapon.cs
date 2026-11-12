@@ -124,6 +124,20 @@ public class CrystalWeapon : MonoBehaviour
     /// <summary>Balas que quedan: los laterales sin gastar más la punta (cargada o creciendo). Empieza con 6 (5 + la punta).</summary>
     public int Balas => (sides.Count - nextSide - Reservados) + (tipLoaded || tipPendiente ? 1 : 0);
 
+    /// <summary>
+    /// Balas que se enseñan en la interfaz: las que quedan más las que están en el aire (aún no se han perdido: si le
+    /// dan a una araña vuelven). Solo baja cuando una bala se pierde de verdad (ver <see cref="BalaPerdida"/>).
+    /// </summary>
+    public int BalasVisibles => Balas + Reservados + ultimasEnVuelo;
+
+    /// <summary>
+    /// Se ha perdido una bala de verdad (es la vida): un disparo que no le da a nadie, un golpe de un enemigo o que
+    /// estallen todas. Disparar por sí solo no la lanza. El parámetro es cuántas.
+    /// </summary>
+    public event System.Action<int> BalaPerdida;
+
+    int ultimasEnVuelo; // balas "última" (la punta sin laterales) que están en el aire
+
     // Laterales reservados por balas en el aire: se rompen cuando la bala se rompe, y no se rompen nunca si la bala
     // le da a una araña o a su cristal.
     bool[] reservado;
@@ -337,7 +351,7 @@ public class CrystalWeapon : MonoBehaviour
             tipPendiente = true;
             StartCoroutine(RegrowTipRoutine());
         }
-        else bala.eraLaUltima = true; // la punta no vuelve, salvo que esta bala le dé a una araña
+        else { bala.eraLaUltima = true; ultimasEnVuelo++; } // la punta no vuelve, salvo que esta bala le dé a una araña
     }
 
     /// <summary>Estallan todas las balas (los laterales y la punta, también las que estaban reservadas): se queda sin ninguna.</summary>
@@ -345,6 +359,8 @@ public class CrystalWeapon : MonoBehaviour
 
     public void EstallarTodas()
     {
+        int antes = BalasVisibles;
+        ultimasEnVuelo = 0;
         estalladas = true;
         StopAllCoroutines(); // nada de volver a crecer
         busy = false;
@@ -369,6 +385,7 @@ public class CrystalWeapon : MonoBehaviour
         }
         tipLoaded = false;
         tipPendiente = false;
+        if (antes > 0) BalaPerdida?.Invoke(antes);
     }
 
     /// <summary>
@@ -378,13 +395,16 @@ public class CrystalWeapon : MonoBehaviour
     /// </summary>
     public void BalaTerminada(CrystalShard bala, bool consumida)
     {
-        if (bala == null || estalladas) return;
+        if (bala == null) return;
+        if (bala.eraLaUltima && ultimasEnVuelo > 0) ultimasEnVuelo--;
+        if (estalladas) return;
         int i = bala.ladoReservado;
         if (i >= 0 && reservado != null && i < reservado.Length && reservado[i])
         {
             reservado[i] = false;
-            if (consumida) RomperLado(i);
+            if (consumida) { RomperLado(i); BalaPerdida?.Invoke(1); } // no le ha dado a nadie: bala perdida
         }
+        else if (bala.eraLaUltima && consumida) BalaPerdida?.Invoke(1); // la última, y ha fallado
         else if (bala.eraLaUltima && !consumida && !tipLoaded && !tipPendiente && tip != null)
         {
             tipPendiente = true;
@@ -418,6 +438,7 @@ public class CrystalWeapon : MonoBehaviour
     {
         if (Balas - balasPorPerder <= 0) return;
         balasPorPerder++;
+        BalaPerdida?.Invoke(1);
         TryPerderBala();
     }
 

@@ -783,7 +783,11 @@ public class Arana : MonoBehaviour
     {
         if (TieneEscudo) return; // primero hay que romper su cristal
         vida--;
-        if (vida <= 0) Morir(true);
+        if (vida <= 0)
+        {
+            if (Partida.Instancia != null) Partida.Instancia.EnemigoMatado(); // la has matado tú
+            Morir(true);
+        }
     }
 
     /// <summary>Se rompe en trocitos de cristal (y suelta el cristal si llevaba uno).</summary>

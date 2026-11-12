@@ -28,6 +28,10 @@ public class Partida : MonoBehaviour
     [Tooltip("Segundos de partida.")]
     public float tiempoInicial = 60f;
 
+    [Header("Sin matar")]
+    [Tooltip("Segundos que puedes estar sin matar a un enemigo. Pasados, el tiempo corre a ritmo normal (1 s por segundo) aunque vayas rápido.")]
+    public float limiteSinMatar = 10f;
+
     [Header("Interfaz")]
     [Tooltip("Tamaño del texto del tiempo (para una pantalla de 1080 de alto).")]
     public int tamanoTexto = 40;
@@ -40,6 +44,7 @@ public class Partida : MonoBehaviour
     float velocidadBase;         // velocidad base máxima actual (baja con los golpes de las arañas)
     float fundido = 1f;          // 1 = negro
     float ritmo;                 // a qué ritmo corre el tiempo ahora (0..1)
+    float sinMatar;              // segundos desde que mataste al último enemigo
     string motivo;
     FirstPersonController jugador;
     CrystalWeapon arma;
@@ -49,6 +54,15 @@ public class Partida : MonoBehaviour
     /// <summary>Segundos que quedan.</summary>
     public float TiempoRestante => tiempo;
     public bool Perdida => estado == Estado.Perdida;
+    /// <summary>Segundos que llevas sin matar a un enemigo.</summary>
+    public float SinMatar => sinMatar;
+    bool SinMatarDemasiado => sinMatar > limiteSinMatar;
+
+    /// <summary>Has matado a un enemigo: el contador de "sin matar" vuelve a 0. Lo llaman las arañas y los ciempiés al morir por tus disparos.</summary>
+    public void EnemigoMatado()
+    {
+        if (estado == Estado.Jugando) sinMatar = 0f;
+    }
 
     /// <summary>Lo añade si no está en la escena. Lo llama <see cref="Arranque"/> cada vez que se carga una escena.</summary>
     public static void Auto()
@@ -115,6 +129,9 @@ public class Partida : MonoBehaviour
             float v = 0f;
             if (jugador != null) { var vel = jugador.Velocity; v = new Vector2(vel.x, vel.z).magnitude; }
             ritmo = Mathf.Clamp01(1f - v / Mathf.Max(0.01f, velocidadReferencia));
+            // Demasiado tiempo sin matar: el tiempo baja 1 s por segundo aunque vayas rápido.
+            sinMatar += Time.deltaTime;
+            if (SinMatarDemasiado) ritmo = 1f;
             tiempo = Mathf.Max(0f, tiempo - ritmo * Time.deltaTime);
 
             if (perdiendo) { }
@@ -206,15 +223,32 @@ public class Partida : MonoBehaviour
         Color c = tiempo < 10f ? new Color(1f, 0.35f, 0.3f) : Color.Lerp(Color.white, new Color(1f, 0.85f, 0.3f), ritmo);
         Sombra(new Rect(0, 20f * esc, Screen.width, estiloTiempo.fontSize * 1.4f), $"{min}:{seg:00.0}", estiloTiempo, c, esc);
         string info = (ritmo <= 0.001f ? "el tiempo está parado" : $"el tiempo corre ×{ritmo:0.00}")
-                      + (velocidadBase < velocidadReferencia - 1e-4f ? $"   ·   velocidad máx {velocidadBase / velocidadReferencia * 100f:0}%" : "")
-                      + (arma != null ? $"   ·   balas {arma.Balas}" : "");
+                      + (velocidadBase < velocidadReferencia - 1e-4f ? $"   ·   velocidad máx {velocidadBase / velocidadReferencia * 100f:0}%" : "");
+        // Las balas ya no salen en texto: las dibuja HUDBalas como iconos arriba a la derecha.
         Sombra(new Rect(0, 20f * esc + estiloTiempo.fontSize * 1.3f, Screen.width, estiloInfo.fontSize * 1.6f), info, estiloInfo, new Color(1f, 1f, 1f, 0.85f), esc);
+
+        // Tiempo sin matar, justo debajo: blanco → amarillo según se acerca al límite; pasado el límite, rojo y latiendo.
+        float ySinMatar = 20f * esc + estiloTiempo.fontSize * 1.3f + estiloInfo.fontSize * 1.6f;
+        Color cSin;
+        string textoSin;
+        if (SinMatarDemasiado)
+        {
+            float latido = 0.65f + 0.35f * Mathf.Sin(Time.unscaledTime * 8f);
+            cSin = new Color(1f, 0.3f, 0.25f, latido);
+            textoSin = $"sin matar {sinMatar:0.0} s   ·   ¡el tiempo corre!";
+        }
+        else
+        {
+            cSin = Color.Lerp(new Color(1f, 1f, 1f, 0.85f), new Color(1f, 0.85f, 0.3f, 1f), Mathf.Clamp01(sinMatar / Mathf.Max(0.01f, limiteSinMatar)));
+            textoSin = $"sin matar {sinMatar:0.0} s";
+        }
+        Sombra(new Rect(0, ySinMatar, Screen.width, estiloInfo.fontSize * 1.6f), textoSin, estiloInfo, cSin, esc);
 
         // Aviso de tiempo perdido.
         if (avisoTiempo > 0f)
         {
             float a = Mathf.Clamp01(avisoTiempo / 0.5f);
-            var r = new Rect(0, 20f * esc + estiloTiempo.fontSize * 1.3f + estiloInfo.fontSize * 1.6f, Screen.width, estiloTiempo.fontSize * 1.2f);
+            var r = new Rect(0, 20f * esc + estiloTiempo.fontSize * 1.3f + estiloInfo.fontSize * 3.2f, Screen.width, estiloTiempo.fontSize * 1.2f);
             Sombra(r, "-" + ultimoQuitado.ToString("0") + " s", estiloTiempo, new Color(1f, 0.3f, 0.25f, a), esc);
         }
 
