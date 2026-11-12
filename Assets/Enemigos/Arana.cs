@@ -841,7 +841,7 @@ public class Arana : MonoBehaviour
         vida--;
         if (vida <= 0)
         {
-            if (Partida.Instancia != null) Partida.Instancia.EnemigoMatado(); // la has matado tú
+            if (Partida.Instancia != null) Partida.Instancia.ContarArana(); // la has matado tú: cuenta para la puntuación
             Morir(true);
         }
     }

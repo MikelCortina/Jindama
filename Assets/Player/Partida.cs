@@ -28,9 +28,11 @@ public class Partida : MonoBehaviour
     [Tooltip("Segundos de partida.")]
     public float tiempoInicial = 60f;
 
-    [Header("Sin matar")]
-    [Tooltip("Segundos que puedes estar sin matar a un enemigo. Pasados, el tiempo corre a ritmo normal (1 s por segundo) aunque vayas rápido.")]
-    public float limiteSinMatar = 10f;
+    [Header("Puntuación")]
+    [Tooltip("Puntos del contador de tiempo por cada segundo que aguantas.")]
+    public int puntosPorSegundo = 10;
+    [Tooltip("Puntos del contador de arañas por cada araña que matas.")]
+    public int puntosPorArana = 10;
 
     [Header("Interfaz")]
     [Tooltip("Tamaño del texto del tiempo (para una pantalla de 1080 de alto).")]
@@ -54,25 +56,27 @@ public class Partida : MonoBehaviour
     float velocidadBase;         // velocidad base máxima actual (baja con los golpes de las arañas)
     float fundido = 1f;          // 1 = negro
     float ritmo;                 // a qué ritmo corre el tiempo ahora (0..1)
-    float sinMatar;              // segundos desde que mataste al último enemigo
+    float segundosAguantados;    // segundos de partida jugados (para la puntuación)
     string motivo;
     FirstPersonController jugador;
     CrystalWeapon arma;
-    GUIStyle estiloTiempo, estiloInfo, estiloGrande;
+    GUIStyle estiloTiempo, estiloInfo, estiloGrande, estiloIzq, estiloIzqGrande;
     static Texture2D negro;
 
     /// <summary>Segundos que quedan.</summary>
     public float TiempoRestante => tiempo;
     public bool Perdida => estado == Estado.Perdida;
-    /// <summary>Segundos que llevas sin matar a un enemigo.</summary>
-    public float SinMatar => sinMatar;
-    bool SinMatarDemasiado => sinMatar > limiteSinMatar;
 
-    /// <summary>Has matado a un enemigo: el contador de "sin matar" vuelve a 0. Lo llaman las arañas y los ciempiés al morir por tus disparos.</summary>
-    public void EnemigoMatado()
-    {
-        if (estado == Estado.Jugando) sinMatar = 0f;
-    }
+    // Puntuación: dos contadores separados que se multiplican.
+    /// <summary>Contador de tiempo: <see cref="puntosPorSegundo"/> por cada segundo aguantado.</summary>
+    public int PuntosTiempo => Mathf.FloorToInt(segundosAguantados) * puntosPorSegundo;
+    /// <summary>Contador de arañas: <see cref="puntosPorArana"/> por cada araña matada.</summary>
+    public int PuntosAranas => aranasMatadas * puntosPorArana;
+    /// <summary>Puntuación total = contador de tiempo × contador de arañas.</summary>
+    public long Puntuacion => (long)PuntosTiempo * PuntosAranas;
+
+    static readonly System.Globalization.CultureInfo es = new System.Globalization.CultureInfo("es-ES");
+    static string Num(long n) => n.ToString("N0", es);
 
     /// <summary>Lo añade si no está en la escena. Lo llama <see cref="Arranque"/> cada vez que se carga una escena.</summary>
     public static void Auto()
@@ -139,10 +143,9 @@ public class Partida : MonoBehaviour
             float v = 0f;
             if (jugador != null) { var vel = jugador.Velocity; v = new Vector2(vel.x, vel.z).magnitude; }
             ritmo = Mathf.Clamp01(1f - v / Mathf.Max(0.01f, velocidadReferencia));
-            // Demasiado tiempo sin matar: el tiempo baja 1 s por segundo aunque vayas rápido.
-            sinMatar += Time.deltaTime;
-            if (SinMatarDemasiado) ritmo = 1f;
             tiempo = Mathf.Max(0f, tiempo - ritmo * Time.deltaTime);
+
+            if (!perdiendo) segundosAguantados += Time.deltaTime;
 
             if (perdiendo) { }
             else if (tiempo <= 0f) Perder("Se acabó el tiempo");
@@ -233,6 +236,8 @@ public class Partida : MonoBehaviour
             estiloTiempo = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.UpperCenter, fontStyle = FontStyle.Bold };
             estiloInfo = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.UpperCenter };
             estiloGrande = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
+            estiloIzq = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.UpperLeft };
+            estiloIzqGrande = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.UpperLeft, fontStyle = FontStyle.Bold };
         }
         estiloTiempo.fontSize = Mathf.RoundToInt(tamanoTexto * esc);
         estiloInfo.fontSize = Mathf.RoundToInt(tamanoTexto * 0.45f * esc);
@@ -244,32 +249,25 @@ public class Partida : MonoBehaviour
         Color c = tiempo < 10f ? new Color(1f, 0.35f, 0.3f) : Color.Lerp(Color.white, new Color(1f, 0.85f, 0.3f), ritmo);
         Sombra(new Rect(0, 20f * esc, Screen.width, estiloTiempo.fontSize * 1.4f), $"{min}:{seg:00.0}", estiloTiempo, c, esc);
         string info = (ritmo <= 0.001f ? "el tiempo está parado" : $"el tiempo corre ×{ritmo:0.00}")
-                      + (velocidadBase < velocidadReferencia - 1e-4f ? $"   ·   velocidad máx {velocidadBase / velocidadReferencia * 100f:0}%" : "")
-                      + $"   ·   arañas {aranasMatadas}";
+                      + (velocidadBase < velocidadReferencia - 1e-4f ? $"   ·   velocidad máx {velocidadBase / velocidadReferencia * 100f:0}%" : "");
         Sombra(new Rect(0, 20f * esc + estiloTiempo.fontSize * 1.3f, Screen.width, estiloInfo.fontSize * 1.6f), info, estiloInfo, new Color(1f, 1f, 1f, 0.85f), esc);
 
-        // Tiempo sin matar, justo debajo: blanco → amarillo según se acerca al límite; pasado el límite, rojo y latiendo.
-        float ySinMatar = 20f * esc + estiloTiempo.fontSize * 1.3f + estiloInfo.fontSize * 1.6f;
-        Color cSin;
-        string textoSin;
-        if (SinMatarDemasiado)
+        // Puntuación arriba a la izquierda (contador de tiempo × contador de arañas).
+        if (estado == Estado.Jugando)
         {
-            float latido = 0.65f + 0.35f * Mathf.Sin(Time.unscaledTime * 8f);
-            cSin = new Color(1f, 0.3f, 0.25f, latido);
-            textoSin = $"sin matar {sinMatar:0.0} s   ·   ¡el tiempo corre!";
+            float x = 28f * esc, y = 20f * esc, ancho = Screen.width * 0.4f;
+            estiloIzq.fontSize = Mathf.RoundToInt(tamanoTexto * 0.45f * esc);
+            Sombra(new Rect(x, y, ancho, estiloIzq.fontSize * 1.5f), "PUNTUACIÓN", estiloIzq, new Color(1f, 1f, 1f, 0.75f), esc);
+            y += estiloIzq.fontSize * 1.3f;
+            estiloIzqGrande.fontSize = Mathf.RoundToInt(tamanoTexto * 0.9f * esc);
+            Sombra(new Rect(x, y, ancho, estiloIzqGrande.fontSize * 1.4f), Num(Puntuacion), estiloIzqGrande, Color.white, esc);
         }
-        else
-        {
-            cSin = Color.Lerp(new Color(1f, 1f, 1f, 0.85f), new Color(1f, 0.85f, 0.3f, 1f), Mathf.Clamp01(sinMatar / Mathf.Max(0.01f, limiteSinMatar)));
-            textoSin = $"sin matar {sinMatar:0.0} s";
-        }
-        Sombra(new Rect(0, ySinMatar, Screen.width, estiloInfo.fontSize * 1.6f), textoSin, estiloInfo, cSin, esc);
 
         // Aviso de tiempo perdido.
         if (avisoTiempo > 0f)
         {
             float a = Mathf.Clamp01(avisoTiempo / 0.5f);
-            var r = new Rect(0, 20f * esc + estiloTiempo.fontSize * 1.3f + estiloInfo.fontSize * 3.2f, Screen.width, estiloTiempo.fontSize * 1.2f);
+            var r = new Rect(0, 20f * esc + estiloTiempo.fontSize * 1.3f + estiloInfo.fontSize * 1.6f, Screen.width, estiloTiempo.fontSize * 1.2f);
             Sombra(r, "-" + ultimoQuitado.ToString("0") + " s", estiloTiempo, new Color(1f, 0.3f, 0.25f, a), esc);
         }
 
@@ -285,9 +283,18 @@ public class Partida : MonoBehaviour
 
         if (estado == Estado.Perdida)
         {
-            Sombra(new Rect(0, Screen.height * 0.38f, Screen.width, estiloGrande.fontSize * 1.4f), "Has perdido", estiloGrande, Color.white, esc);
-            Sombra(new Rect(0, Screen.height * 0.38f + estiloGrande.fontSize * 1.4f, Screen.width, estiloInfo.fontSize * 3f),
-                   motivo + "\nR o clic para volver a empezar", estiloInfo, new Color(1f, 1f, 1f, 0.9f), esc);
+            float y = Screen.height * 0.3f;
+            Sombra(new Rect(0, y, Screen.width, estiloGrande.fontSize * 1.4f), "Has perdido", estiloGrande, Color.white, esc);
+            y += estiloGrande.fontSize * 1.4f;
+            Sombra(new Rect(0, y, Screen.width, estiloInfo.fontSize * 1.6f), motivo, estiloInfo, new Color(1f, 1f, 1f, 0.9f), esc);
+            y += estiloInfo.fontSize * 2.6f;
+
+            // Puntuación final.
+            Sombra(new Rect(0, y, Screen.width, estiloInfo.fontSize * 1.6f), "PUNTUACIÓN", estiloInfo, new Color(1f, 1f, 1f, 0.75f), esc);
+            y += estiloInfo.fontSize * 1.4f;
+            Sombra(new Rect(0, y, Screen.width, estiloTiempo.fontSize * 1.4f), Num(Puntuacion), estiloTiempo, new Color(1f, 0.85f, 0.3f), esc);
+            y += estiloTiempo.fontSize * 1.4f + estiloInfo.fontSize * 1.4f;
+            Sombra(new Rect(0, y, Screen.width, estiloInfo.fontSize * 1.6f), "R o clic para volver a empezar", estiloInfo, new Color(1f, 1f, 1f, 0.9f), esc);
         }
     }
 
